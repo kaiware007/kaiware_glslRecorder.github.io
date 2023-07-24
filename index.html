@@ -21,7 +21,13 @@
         <script src="addon/scroll/simplescrollbars.js"></script>
         <!-- <script src="javascript.js"></script> -->
 
-        <script src="lib/whammy.js"></script>
+        <!-- <script src="lib/whammy.js"></script> -->
+        <script type="text/javascript" src="lib/webm-writer-0.3.0.js"></script>
+
+        <script src="lib/b64.js"></script>
+        <script src="lib/LZWEncoder.js"></script>
+        <script src="lib/NeuQuant.js"></script>
+        <script src="lib/GIFEncoder.js"></script>
 
         <title>GLSL Editor test</title>
     </head>
@@ -60,14 +66,25 @@
           <div class="controlbar">
             <span class="controlbar-span">Resolution</span>
             <select id="resolution">
+              <option value="540x540">540x540</option>
               <option value="640x360">640x360</option>
-              <option value="1280x720">HD(1280x720)</option>
+              <option value="800x80">800x80</option>
+              <option value="960x720">4:3(960x720)</option>
+              <option value="1280x720">HD横(1280x720)</option>
+              <option value="720x1280">HD縦(720x1280)</option>
               <option value="1920x1080">Full HD(1920x1080)</option>
               <option value="2560x1440">2K(2560x1440)</option>
               <option value="3840x2160">4K(3840x2160)</option>
+              <option value="7680x4320">8K(7680x4320)</option>
+              <!-- <option value="7680x7680">8K(7680x7680)</option>
+              <option value="15360x8640">16K(15360x8640)</option> -->
             </select>
             <span class="controlbar-span">FPS</span><input type="text" value="60" id="targetfps">
             <span>
+              <select id="recodemode">
+                <option value="webm">WebM</option>
+                <option value="gif">GIF</option>
+              </select>
               <input type="button" value="Start Record" id="renderbutton">
             </span>
           </div>

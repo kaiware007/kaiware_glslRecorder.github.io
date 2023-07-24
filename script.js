@@ -13,6 +13,9 @@ var targetfps = 60;
 var frame = 0;
 var maxframe = 0;
 var encoder = null;
+var recodeMode = 'webm';
+var pdata = null;
+var pdata2 = null;
 
 function changeTimeLength()
 {
@@ -152,8 +155,7 @@ onload = function(){
   }
 
   var renderButton = document.getElementById('renderbutton').onclick = () => {
-      if(!isRecording)
-      {
+      if(!isRecording){
         startRecord();
       }else{
         stopRecord();
@@ -168,6 +170,11 @@ onload = function(){
     glHeight = Number(resolution[1]);
     changeCanvasSize(glWidth, glHeight);
     render();
+  }
+
+  var recodemodeSelect = document.getElementById('recodemode').onchange = () => {
+    let index = document.getElementById('recodemode').selectedIndex;
+    recodeMode = document.getElementById('recodemode').value;
   }
 
   var startTimeInput = document.getElementById('starttime').onchange = () => {
@@ -263,22 +270,76 @@ onload = function(){
 
     frame = 0;
     maxframe = Math.floor(targetfps * timeLength);
-    encoder = new Whammy.Video(targetfps);
+    switch (recodeMode) {
+      case 'gif':
+        pdata = new Uint8ClampedArray(4*c.width*c.height);
+        pdata2 = new Uint8ClampedArray(4*c.width*c.height);
+        //pdata = c.getContext('2d').createImageData(c.width, c.height);
+        encoder = new GIFEncoder();
+        encoder.setSize(c.width, c.height);
+        encoder.setRepeat(0);
+        encoder.setDelay(1.0 / fps);
+        // encoder.setDelay(500);
+        encoder.start();
+        break;
+      default:
+        //encoder = new Whammy.Video(targetfps);
+        encoder = new WebMWriter({
+          quality : 0.95,
+          fileWriter: null,
+          fd: null,
+          frameDuration: null,
+          frameRate: targetfps,
+          transparent: false,
+          alphaQuality: undefined
+        });
+    }
   }
 
   function updateRecord(){
     if(frame > maxframe)
     {
       isRecording = false;
-      encoder.compile(false, function (output) {
-        exportVideo(output);
-      });
+      switch (recodeMode) {
+        case 'gif':
+          encoder.finish();
+          // encoder.download("download.gif");
+          // var bin = new Uint8Array(encoder.stream().bin);
+	        // var blob = new Blob([bin.buffer], {type: 'image/gif'});
+          // exportGIF(blob);
+          var url = 'data:image/gif;base64,' + encode64(encoder.stream().getData());
+          exportGIF(url);
+
+          stopRecord();
+          break;
+        default:
+          encoder.complete().then(function(webMBlob) {
+            exportVideo(webMBlob);
+            stopRecord();
+          });
+          //   exportVideo(output);
+          //   stopRecord();
+          // encoder.compile(false, function (output) {
+          // });
+      }
       document.getElementById('renderlog').innerHTML = "Render finished";
       return;
     }
     render();
 
-    encoder.add(c.toDataURL('image/webp'));
+    switch (recodeMode) {
+        case 'gif':
+          gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, pdata);
+          reverseYpixels(pdata, pdata2);
+          //console.log(pdata);
+          encoder.addFrame(pdata2, true);
+          //encoder.addFrame(pdata2);
+          // encoder.addFrame(c);
+          break;
+      default:
+          //encoder.add(c.toDataURL('image/webp'));
+          encoder.addFrame(c);
+    }
 
     timePosition += 1 / targetfps;
     frame++;
@@ -286,16 +347,31 @@ onload = function(){
     document.getElementById('renderlog').innerHTML = "Rendering " + frame + " / " + maxframe;
   }
 
+  function reverseYpixels(src, dest){
+    for(let y=0;y < c.height;y++){
+        for(let x=0; x < c.width;x++) {
+          dest[4*((c.height-y)*c.width+x)+0] = src[4*(y*c.width+x)+0];
+          dest[4*((c.height-y)*c.width+x)+1] = src[4*(y*c.width+x)+1];
+          dest[4*((c.height-y)*c.width+x)+2] = src[4*(y*c.width+x)+2];
+          dest[4*((c.height-y)*c.width+x)+3] = src[4*(y*c.width+x)+3];
+        }
+      }
+  }
+
   function stopRecord(){
     isRecording = false;
 
     encoder = null;
+    pdata = null;
 
     document.getElementById('renderbutton').value = "Start Record";
   }
 
   function exportVideo (blob){
-    // window.open(URL.createObjectURL(blob), "resizable=no,scrollbars=yes,status=no");
+    let gif = document.getElementById('outputgif');
+    if(gif != null){
+      gif.remove();
+    }
     let video = document.getElementById("outputvideo");
     if(video == null){
       video = document.createElement('video');
@@ -309,6 +385,24 @@ onload = function(){
       video.loop = true;
       video.controls = true;
       video.id = "outputvideo";
+    }
+  }
+
+  function exportGIF(blob){
+    let video = document.getElementById("outputvideo");
+    if(video != null){
+      video.remove();
+    }
+    let gif = document.getElementById('outputgif');
+    if(gif == null){
+      gif = document.createElement('img');
+      gif.src = blob;
+      //gif.src = URL.createObjectURL(blob);
+      gif.id = 'outputgif'
+      document.body.appendChild(gif);
+    }else{
+      gif.src = blob;
+      gif.id = 'outputgif'
     }
   }
 
@@ -343,7 +437,15 @@ onload = function(){
     //var c = document.getElementById('canvas');
     c.width = width;
     c.height = height;
-
+    if(width > 1280)
+    {
+      let s = 1280.0 / width;
+      c.style.width = "1280 px";
+      c.style.height = Math.floor(height * s) + "px";
+    }else{
+      c.style.width = "";
+      c.style.height = "";
+    }
     initWebGL();
 
     var left = document.getElementById("blockleft");
